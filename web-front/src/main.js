@@ -1,19 +1,32 @@
-import Vue from 'vue'
+import * as Vue from 'vue'
 import App from './App.vue'
-import ElementUI from 'element-ui'
-import 'element-ui/lib/theme-chalk/index.css'
-import VueClipboard from 'vue-clipboard2'
-import JsonViewer from 'vue-json-viewer'
+import VueClipboard from 'vue-clipboard3'
+import DirectiveExtensions from './directive'
+
+import JsonViewer from 'vue3-json-viewer'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+import 'element-plus/theme-chalk/dark/css-vars.css'
+import "vue3-json-viewer/dist/index.css";
+import './styles/dark/css-vars.css'
+import router from './router/index.js'
+
+const app = Vue.createApp(App)
+app.use(router)
+
+
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+    app.component(key, component)
+}
 
 // Import JsonViewer as a Vue.js plugin
-Vue.use(JsonViewer)
+app.use(JsonViewer)
+app.use(DirectiveExtensions)
 
 // or
 // components: {JsonViewer}
 
-Vue.use(VueClipboard)
-Vue.config.productionTip = false
-Vue.use(ElementUI)
-new Vue({
-  render: h => h(App),
-}).$mount('#app')
+app.use(VueClipboard)
+app.use(ElementPlus)
+app.mount('#app')

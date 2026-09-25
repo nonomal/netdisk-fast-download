@@ -34,8 +34,6 @@ public class JsonResult<T> implements Serializable {
 
     private boolean success = true; //是否成功
 
-    private int count;
-
     private T data;
 
     private long timestamp = System.currentTimeMillis(); //时间戳
@@ -52,20 +50,6 @@ public class JsonResult<T> implements Serializable {
         this.msg = msg;
         this.data = data;
         this.success = success;
-    }
-
-    public JsonResult(int code, String msg, boolean success, T data, int count) {
-        this(code, msg, success, data);
-        this.count = count;
-    }
-
-    public int getCount() {
-        return count;
-    }
-
-    public JsonResult<T> setCount(int count) {
-        this.count = count;
-        return this;
     }
 
     public int getCode() {
@@ -136,20 +120,9 @@ public class JsonResult<T> implements Serializable {
         return new JsonResult<>(SUCCESS_CODE, msg, true, data);
     }
 
-    // 响应成功消息和数据实体
-    public static <T> JsonResult<T> data(String msg, T data, int count) {
-        if (StringUtils.isEmpty(msg)) msg = SUCCESS_MESSAGE;
-        return new JsonResult<>(SUCCESS_CODE, msg, true, data, count);
-    }
-
     // 响应数据实体
     public static <T> JsonResult<T> data(T data) {
-        return new JsonResult<>(SUCCESS_CODE, SUCCESS_MESSAGE, true, data, 0);
-    }
-
-    // 响应数据实体
-    public static <T> JsonResult<T> data(T data, int count) {
-        return new JsonResult<>(SUCCESS_CODE, SUCCESS_MESSAGE, true, data, count);
+        return new JsonResult<>(SUCCESS_CODE, SUCCESS_MESSAGE, true, data);
     }
 
     // 响应成功消息

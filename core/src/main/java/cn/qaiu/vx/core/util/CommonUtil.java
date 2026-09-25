@@ -3,8 +3,6 @@ package cn.qaiu.vx.core.util;
 import cn.qaiu.vx.core.annotaions.HandleSortFilter;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.json.JsonObject;
-import org.apache.commons.beanutils2.ConvertUtils;
-import org.apache.commons.beanutils2.Converter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,8 +13,12 @@ import java.net.Socket;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -29,6 +31,16 @@ public class CommonUtil {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CommonUtil.class);
 
+    /** 正则表达式缓存，避免每次调用重新编译 */
+    private static final ConcurrentHashMap<String, Pattern> PATTERN_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * 获取预编译的 Pattern（带缓存）
+     */
+    private static Pattern getCachedPattern(String regex) {
+        return PATTERN_CACHE.computeIfAbsent(regex, Pattern::compile);
+    }
+
     /**
      * 匹配正则list
      *
@@ -39,7 +51,7 @@ public class CommonUtil {
     public static boolean matchRegList(List<?> regList, String destStr) {
         // 判断是否忽略
         for (Object ignores : regList) {
-            if (destStr.matches(ignores.toString())) {
+            if (getCachedPattern(ignores.toString()).matcher(destStr).matches()) {
                 return true;
             }
         }
@@ -100,23 +112,6 @@ public class CommonUtil {
     }
 
     /**
-     * 注册枚举转换器
-     *
-     * @param enums 枚举类
-     */
-    @SafeVarargs
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public static void enumConvert(Class<? extends Enum>... enums) {
-        for (Class<? extends Enum> anEnum : enums) {
-            ConvertUtils.register(new Converter() {
-                public Object convert(Class type, Object value) {
-                    return Enum.valueOf(anEnum, (String) value);
-                }
-            }, anEnum);
-        }
-    }
-
-    /**
      * 处理其他配置
      *
      * @param configName configName
@@ -135,7 +130,7 @@ public class CommonUtil {
         return set.stream().filter(c1 -> {
             HandleSortFilter s1 = c1.getAnnotation(HandleSortFilter.class);
             if (s1 != null) {
-                return s1.value() > 0;
+                return s1.value() >= 0;
             } else {
                 return true;
             }
@@ -156,6 +151,30 @@ public class CommonUtil {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        }).collect(Collectors.toSet());
+        }).collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static String appVersion;
+
+    public static String getAppVersion() {
+        if (null == appVersion) {
+            Properties properties = new Properties();
+            try (var is = CommonUtil.class.getClassLoader().getResourceAsStream("app.properties")) {
+                if (is != null) {
+                    properties.load(is);
+                    String version = properties.getProperty("app.version");
+                    String build = properties.getProperty("build");
+                    if (version != null && !version.contains("${")) {
+                        appVersion = version + "build" + (build == null || build.contains("${") ? "" : build);
+                    }
+                }
+            } catch (Exception e) {
+                LOGGER.error("读取app.properties失败", e);
+            }
+            if (appVersion == null) {
+                appVersion = "unknown";
+            }
+        }
+        return appVersion;
     }
 }

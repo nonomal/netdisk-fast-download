@@ -23,3 +23,5 @@ pnpm-debug.log*
 *.sw?
 /nfd-front.zip
 /nfd-front
+/package-lock.json
+/yarn.lock

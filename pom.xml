@@ -17,7 +17,7 @@
     </modules>
 
     <properties>
-        <revision>0.1.7</revision>
+        <revision>0.4.7</revision>
         <java.version>17</java.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -25,15 +25,18 @@
 
         <packageDirectory>${project.basedir}/web-service/target/package</packageDirectory>
 
-        <slf4j.version>2.0.5</slf4j.version>
-        <vertx.version>4.5.6</vertx.version>
+        <!-- Vert.x 4.5.27 包含安全修复，无需单独指定 Netty 版本 -->
+        <vertx.version>4.5.27</vertx.version>
         <org.reflections.version>0.10.2</org.reflections.version>
-        <lombok.version>1.18.12</lombok.version>
-        <slf4j.version>2.0.5</slf4j.version>
-        <commons-lang3.version>3.12.0</commons-lang3.version>
+        <lombok.version>1.18.38</lombok.version>
+        <slf4j.version>2.0.16</slf4j.version>
+        <commons-lang3.version>3.18.0</commons-lang3.version>
         <commons-beanutils2.version>2.0.0</commons-beanutils2.version>
-        <jackson.version>2.14.2</jackson.version>
-        <logback.version>1.4.12</logback.version>
+        <parserVersion>10.2.5</parserVersion>
+        <jackson.version>2.18.9</jackson.version>
+        <!-- Logback 最新稳定版 -->
+        <logback.version>1.5.34</logback.version>
+        <junit.version>4.13.2</junit.version>
     </properties>
 
     <dependencyManagement>
@@ -44,6 +47,18 @@
                 <version>${vertx.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- 统一管理 logback 版本 -->
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-core</artifactId>
+                <version>${logback.version}</version>
             </dependency>
 
             <dependency>
@@ -60,7 +75,7 @@
             <dependency>
                 <groupId>cn.qaiu</groupId>
                 <artifactId>parser</artifactId>
-                <version>${revision}</version>
+                <version>${parserVersion}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -70,10 +85,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.6.2</version>
+                <version>3.13.0</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <release>${java.version}</release>
                 </configuration>
             </plugin>
 
@@ -83,7 +97,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.2</version>
                 <configuration>
-                    <skipTests>true</skipTests>
+                     <skipTests>true</skipTests>
                 </configuration>
             </plugin>
             <plugin>

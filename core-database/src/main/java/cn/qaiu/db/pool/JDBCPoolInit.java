@@ -1,10 +1,13 @@
 package cn.qaiu.db.pool;
 
 import cn.qaiu.db.ddl.CreateTable;
+import cn.qaiu.db.ddl.CreateDatabase;
 import cn.qaiu.vx.core.util.VertxHolder;
+import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.jdbcclient.JDBCPool;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,21 +17,32 @@ import org.slf4j.LoggerFactory;
  *
  * @author <a href="https://qaiu.top">QAIU</a>
  */
-public class JDBCPoolInit {
+public class JDBCPoolInit implements AutoCloseable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JDBCPoolInit.class);
+
+    private static final String providerClass = io.vertx.ext.jdbc.spi.impl.HikariCPDataSourceProvider.class.getName();
+
     private JDBCPool pool = null;
     JsonObject dbConfig;
     Vertx vertx = VertxHolder.getVertxInstance();
     String url;
-    private JDBCType type;
+
+    private final JDBCType type;
 
     private static JDBCPoolInit instance;
+
+    public JDBCType getType() {
+        return type;
+    }
 
     public JDBCPoolInit(Builder builder) {
         this.dbConfig = builder.dbConfig;
         this.url = builder.url;
-        this.type = builder.type;
+        this.type = JDBCType.getJDBCTypeByURL(builder.url);
+        if (StringUtils.isBlank(builder.dbConfig.getString("provider_class"))) {
+            builder.dbConfig.put("provider_class", providerClass);
+        }
     }
 
     public static Builder builder() {
@@ -42,12 +56,10 @@ public class JDBCPoolInit {
     public static class Builder {
         private JsonObject dbConfig;
         private String url;
-        private JDBCType type;
 
         public Builder config(JsonObject dbConfig) {
             this.dbConfig = dbConfig;
             this.url = dbConfig.getString("jdbcUrl");
-            this.type = JDBCUtil.getJDBCType(dbConfig.getString("driverClassName"));
             return this;
         }
 
@@ -59,35 +71,46 @@ public class JDBCPoolInit {
         }
     }
 
-
     /**
      * init h2db<br>
      * 这个方法只允许调用一次
      */
-    public void initPool() {
+    synchronized public Future<Void> initPool() {
         if (pool != null) {
             LOGGER.error("pool 重复初始化");
-            return;
+            return null;
         }
 
         // 初始化数据库连接
-        vertx.createSharedWorkerExecutor("sql-pool-init")
-                .executeBlocking(() -> {
-                    // 初始化连接池
-                    pool = JDBCPool.pool(vertx, dbConfig);
-                    CreateTable.createTable(pool, type);
-                    return "数据库连接初始化: URL=" + url;
-                })
-                .onSuccess(LOGGER::info)
-                .onFailure(Throwable::printStackTrace);
+        // 初始化连接池
+        if (type == JDBCType.MySQL) {
+            CreateDatabase.createDatabase(dbConfig);
+        }
+        pool = JDBCPool.pool(vertx, dbConfig);
+        LOGGER.info("数据库连接初始化: URL=" + url);
+        return CreateTable.createTable(pool, type);
     }
+
+
 
     /**
      * 获取连接池
      *
      * @return pool
      */
-    public JDBCPool getPool() {
+    synchronized public JDBCPool getPool() {
         return pool;
+    }
+
+    /**
+     * 关闭连接池，释放数据库资源
+     */
+    @Override
+    public synchronized void close() {
+        if (pool != null) {
+            pool.close();
+            LOGGER.info("数据库连接池已关闭: URL={}", url);
+            pool = null;
+        }
     }
 }

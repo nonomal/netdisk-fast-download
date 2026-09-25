@@ -1,8 +1,7 @@
 package cn.qaiu.parser.impl;
 
-import cn.qaiu.parser.IPanTool;
+import cn.qaiu.entity.ShareLinkInfo; 
 import cn.qaiu.parser.PanBase;
-import cn.qaiu.util.CommonUtils;
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
 import io.vertx.core.Promise;
@@ -19,22 +18,46 @@ import java.util.regex.Pattern;
 /**
  * 360亿方云
  */
-public class FcTool extends PanBase implements IPanTool {
+public class FcTool extends PanBase {
 
-    public static final String SHARE_URL_PREFIX0 = "https://v2.fangcloud.com/s";
     public static final String SHARE_URL_PREFIX = "https://v2.fangcloud.com/sharing/";
     public static final String SHARE_URL_PREFIX2 = "https://v2.fangcloud.cn/sharing/";
+    private static final String SHARE_INFO_URL = "https://v2.fangcloud.cn/apps/share_links/info/";
     private static final String DOWN_REQUEST_URL = "https://v2.fangcloud.cn/apps/files/download?file_id={fid}" +
             "&scenario=share&unique_name={uname}";
 
-    public FcTool(String key, String pwd) {
-        super(key, pwd);
+    // 静态编译的正则表达式，避免每次调用都重新编译
+    private static final Pattern REQUEST_TOKEN_PATTERN = Pattern.compile("name=\"requesttoken\"\\s+value=\"([a-zA-Z0-9_+=]+)\"");
+    private static final Pattern TYPED_ID_PATTERN = Pattern.compile("id=\"typed_id\"\\s+value=\"file_(\\d+)\"");
+
+    public FcTool(ShareLinkInfo shareLinkInfo) {
+        super(shareLinkInfo);
     }
 
+
     public Future<String> parse() {
-        String data = key.replace("share","sharing");
-        String dataKey = CommonUtils.adaptShortPaths(SHARE_URL_PREFIX, data);
+        final String dataKey = shareLinkInfo.getShareKey();
+        final String pwd = shareLinkInfo.getSharePassword();
         WebClientSession sClient = WebClientSession.create(client);
+        // 先查询分享有效性, 避免分享已失效/已过期时仍去解析HTML, 报出令人困惑的技术错误
+        sClient.getAbs(SHARE_INFO_URL + dataKey).send().onSuccess(infoRes -> {
+            JsonObject infoJson = asJson(infoRes);
+            if (promise.future().isComplete()) {
+                return;
+            }
+            JsonObject process = infoJson.getJsonObject("process");
+            boolean isClosed = process != null && Boolean.TRUE.equals(process.getBoolean("is_closed"));
+            boolean isExpired = process != null && Boolean.TRUE.equals(process.getBoolean("is_expired"));
+            if (process == null || isClosed || isExpired) {
+                fail("分享已失效或不存在");
+                return;
+            }
+            doParse(dataKey, pwd, sClient);
+        }).onFailure(handleFail(SHARE_INFO_URL + dataKey));
+        return promise.future();
+    }
+
+    private void doParse(String dataKey, String pwd, WebClientSession sClient) {
         // 第一次请求 自动重定向
         sClient.getAbs(SHARE_URL_PREFIX + dataKey).send().onSuccess(res -> {
 
@@ -42,8 +65,7 @@ public class FcTool extends PanBase implements IPanTool {
             if (StringUtils.isNotEmpty(pwd)) {
                 // 获取requesttoken
                 String html = res.bodyAsString();
-                Pattern compile = Pattern.compile("name=\"requesttoken\"\\s+value=\"([a-zA-Z0-9_+=]+)\"");
-                Matcher matcher = compile.matcher(html);
+                Matcher matcher = REQUEST_TOKEN_PATTERN.matcher(html);
                 if (!matcher.find()) {
                     fail(SHARE_URL_PREFIX + " 未匹配到加密分享的密码输入页面的requesttoken");
                     return;
@@ -65,15 +87,13 @@ public class FcTool extends PanBase implements IPanTool {
             }
             getDownURL(dataKey, promise, res, sClient);
         }).onFailure(handleFail(SHARE_URL_PREFIX + dataKey));
-        return promise.future();
     }
 
     private void getDownURL(String dataKey, Promise<String> promise, HttpResponse<Buffer> res,
                                    WebClientSession sClient) {
         // 从HTML中找到文件id
         String html = res.bodyAsString();
-        Pattern compile = Pattern.compile("id=\"typed_id\"\\s+value=\"file_(\\d+)\"");
-        Matcher matcher = compile.matcher(html);
+        Matcher matcher = TYPED_ID_PATTERN.matcher(html);
         if (!matcher.find()) {
             fail(SHARE_URL_PREFIX + " 未匹配到文件id(typed_id)");
             return;
@@ -88,7 +108,7 @@ public class FcTool extends PanBase implements IPanTool {
                 .setTemplateParam("unique_name", dataKey).send().onSuccess(res2 -> {
                     JsonObject resJson;
                     try {
-                        resJson = res2.bodyAsJsonObject();
+                        resJson = asJson(res2);
                     } catch (Exception e) {
                         fail(e, DOWN_REQUEST_URL + " 第二次请求没有返回JSON, 可能下载受限");
                         return;

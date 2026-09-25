@@ -21,7 +21,6 @@ public @interface Constraint {
     boolean notNull() default false;
 
     /**
-     * 唯一键约束 TODO 待实现
      * @return 唯一键约束
      */
     String uniqueKey() default "";
@@ -32,7 +31,7 @@ public @interface Constraint {
      */
     String defaultValue() default "";
     /**
-     * 默认值是否是函数
+     * 默认值是否是函数 like value=NOW()
      * @return false 不是函数
      */
     boolean defaultValueIsFunction() default false;

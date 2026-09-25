@@ -6,6 +6,13 @@ public interface ConfigConstant {
     String EVENT_LOOP_POOL_SIZE = "eventLoopPoolSize";
     String LOCAL = "local";
     String SERVER = "server";
+    String CACHE = "cache";
+
+    String PROXY_SERVER = "proxy-server";
+
+    String PROXY = "proxy";
+
+    String AUTHS = "auths";
     String GLOBAL_CONFIG = "globalConfig";
     String CUSTOM_CONFIG = "customConfig";
     String ASYNC_SERVICE_INSTANCES = "asyncServiceInstances";
